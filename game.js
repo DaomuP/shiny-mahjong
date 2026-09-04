@@ -81,7 +81,7 @@ const UNIT_EFFECT = {
   'illumination STARS': { key: 'draw2', name: '摸 2 张', desc: '从牌山摸 2 张入手' },
   "L'Antica": { key: 'take2', name: '明牌列扫 2', desc: '从明牌列拿 2 张入手，空位从牌山补 2 张，再弃 1 张手牌' },
   'noctchill': { key: 'darkpick', name: '暗堆回收', desc: '看暗堆选 1 张入手，然后弃 1 张手牌' },
-  '放課後クライマックスガールズ': { key: 'peek3', name: '牌山精选', desc: '看牌山顶 3 张，选 1 张入手，其余放回' },
+  '放課後クライマックスガールズ': { key: 'peek4', name: '牌山精选', desc: '看牌山顶 4 张，选 1 张入手，其余放回' },
   'Straylight': { key: 'reshuffle', name: '市场重置', desc: '明牌列全部洗回牌山，重新翻开' },
   'ALSTROEMERIA': { key: 'refresh', name: '手牌重整', desc: '任意张手牌放回牌山，摸相同张数' },
   'CoMETIK': { key: 'spy', name: '查验', desc: '查看一名对手的全部手牌' },
@@ -96,6 +96,7 @@ function log(m) { G.logs.push(m); if (G.logs.length > 300) G.logs.shift(); }
 function drawCards(n) { const out = []; while (n-- > 0) { if (G.deck.length <= 8 && G.dark.length) { G.deck = shuffle(G.deck.concat(G.dark.splice(0))); log('弃牌洗回牌山'); } if (!G.deck.length) break; out.push(G.deck.pop()); } return out; }
 function sortHand(p) { p.hand.sort((a, b) => (UNIT_ORDER[a.unit] - UNIT_ORDER[b.unit]) || (a.waveKey < b.waveKey ? -1 : a.waveKey > b.waveKey ? 1 : 0) || (a.idol < b.idol ? -1 : a.idol > b.idol ? 1 : 0)); }
 function sortDisplay() { G.display.sort((a, b) => { if (!a && !b) return 0; if (!a) return 1; if (!b) return -1; return (UNIT_ORDER[a.unit] - UNIT_ORDER[b.unit]) || (a.waveKey < b.waveKey ? -1 : a.waveKey > b.waveKey ? 1 : 0) || (a.idol < b.idol ? -1 : a.idol > b.idol ? 1 : 0); }); }
+function sortDark() { G.dark.sort((a, b) => (UNIT_ORDER[a.unit] - UNIT_ORDER[b.unit]) || (a.waveKey < b.waveKey ? -1 : a.waveKey > b.waveKey ? 1 : 0) || (a.idol < b.idol ? -1 : a.idol > b.idol ? 1 : 0)); }
 /* 计分：套牌分值与其内部必须同时在手牌共存的牌对数 C(k,2) 成正比。
    2 人套（1 个约束）为基准 20 分，四舍五入到 5 */
 function comb(n, k) { let r = 1; for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1); return r; }
@@ -281,9 +282,9 @@ async function applyUnitEffect(p, unit, i, card) {
       if (pay) { p.hand.splice(p.hand.indexOf(pay), 1); G.dark.push(pay); sfx('discard'); }
       break;
     }
-    case 'peek3': {
+    case 'peek4': {
       const top = [];
-      for (let k = 0; k < 3; k++) { const c = drawCards(1)[0]; if (c) top.push(c); }
+      for (let k = 0; k < 4; k++) { const c = drawCards(1)[0]; if (c) top.push(c); }
       if (!top.length) break;
       let chosen;
       if (p.ai) chosen = top.slice().sort((a, b) => cardValueFor(p, b) - cardValueFor(p, a))[0];
@@ -377,7 +378,7 @@ function render() {
   $('#darkPile').classList.toggle('pileempty', !G.dark.length);
   $('#auctionGrid').innerHTML = (G.auctionCards || []).map((c, k) => cardImg(c, 'mini2b', 'auc', k)).join('');
   $('#showInfo').innerHTML = `<div>当前出价 <b class="abid">${G.showBid ? G.showBid.bid : 0}</b> 张暗牌${G.showBid && G.showBid.bidder !== null ? '（' + esc(G.players[G.showBid.bidder].name) + '）' : ''}</div>${UI.bidAsk ? `<div class="ask">是否出价 ${UI.bidAsk.need} 张？<button data-bid="yes">出价</button> <button data-bid="no">放弃</button></div>` : '<div class="dim">等待轮次结束开拍</div>'}`;
-  sortDisplay();
+  sortDisplay(); sortDark();
   $('#displayGrid').innerHTML = G.display.map((c, idx) => { if (!c) return '<div class="tile empty"></div>'; const clickable = myTurnActive() ? 'clickable' : ''; const target = UI.swap && UI.swap.idx === idx ? ' swaptarget' : ''; return cardImg(c, clickable + target, 'display', idx); }).join('');
   $('#mePlate').innerHTML = `<span class="pname">${esc(me.name)}</span><span class="pscore">${me.score} 分</span><span class="medone">${me.done.map(d => doneChip(d)).join('')}</span>`;
   const fanStyle = (idx, n) => { const off = idx - (n - 1) / 2; return `--r:${(off * 3.5).toFixed(1)}deg;--ty:${(off * off * 1.5).toFixed(0)}px`; };
