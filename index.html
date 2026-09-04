@@ -110,6 +110,32 @@
   .tile.picked { outline: 4px solid #ff9d00; transform: translateY(-6px); }
   .tile.swaptarget { outline: 4px solid #ff9d00; }
   .tile.swapsrc { cursor: pointer; }
+  .tile.tenpai { outline: 4px solid #9ad6ff; filter: brightness(1.18); animation: tenpaiPulse 1.2s ease-in-out infinite; }
+  @keyframes tenpaiPulse {
+    0%, 100% { box-shadow: 0 0 10px 4px #6ec1ff99; }
+    50% { box-shadow: 0 0 26px 12px #9ad6fff2; }
+  }
+  .tile.missing { outline: 5px solid #ff8fc0; filter: brightness(1.15); animation: missPulse 1s ease-in-out infinite; }
+  @keyframes missPulse {
+    0%, 100% { box-shadow: 0 0 12px 5px #ff5fa299; }
+    50% { box-shadow: 0 0 30px 14px #ff8fc0f2; }
+  }
+
+  #helpBtns { position: fixed; right: 14px; bottom: 12px; z-index: 30; display: flex; gap: 10px; }
+  #helpBtns button { background: #1d3a5f; color: #ffd479; border: 1px solid #4a7fb5; border-radius: 10px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 5px #1d3a5f44; }
+  #codexModal .inner, #rulesModal .inner { text-align: left; }
+  #codexInner h4 { margin: 12px 0 6px; color: #1d3a5f; font-size: 15px; border-left: 4px solid #d99a26; padding-left: 8px; }
+  .codexwave { border-bottom: 1px dashed #9cc3e0; padding-bottom: 10px; margin-bottom: 10px; }
+  .codexhead { font-size: 13px; font-weight: 700; color: #4a6a8f; margin-bottom: 6px; }
+  #codexModal .tile.codexcard { width: 76px; height: 107px; }
+  #codexModal .tile.codexcard.held { outline: 3px solid #ffd479; box-shadow: 0 0 8px #ffd47966; }
+  #codexModal .tile:hover { overflow: visible; z-index: 60; }
+  #codexModal .tile:hover img.pv { display: block; position: absolute; width: 360px; height: 203px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; object-fit: contain; background: #fff; border-radius: 6px; outline: 3px solid #ffd479; box-shadow: 0 16px 36px #1d3a5f88; z-index: 60; }
+  .ruletbl { border-collapse: collapse; width: 100%; margin: 6px 0 2px; }
+  .ruletbl th, .ruletbl td { border-bottom: 1px solid #cfe0ef; padding: 5px 8px; font-size: 13px; text-align: left; }
+  .ruletbl th { color: #1d3a5f; }
+  #rulesInner ul { margin: 4px 0; padding-left: 20px; }
+  #rulesInner li { margin: 3px 0; }
   .tile.mini2b { width: 64px; height: 90px; }
   #auctionGrid .tile.mini2b { width: 200px; height: 113px; }
   #auctionGrid .tile.mini2b img { object-fit: contain; }
@@ -150,6 +176,13 @@
   #pickHint button { background: #fff; border: 1px solid #9cc3e0; border-radius: 6px; padding: 3px 10px; }
   #pickConfirm { }
   #pickConfirm button { background: #ff9d00; color: #fff; font-weight: 700; border: none; border-radius: 8px; padding: 8px 16px; font-size: 14px; }
+
+  .tile.freshcard { animation: freshIn 430ms cubic-bezier(.2,.85,.3,1.04) both; z-index: 50; }
+  @keyframes freshIn {
+    0% { transform: translateY(150px) scale(.55); opacity: 0; filter: brightness(2); }
+    72% { transform: translateY(26px) scale(1.06); opacity: 1; filter: brightness(1.45); }
+    100% { transform: rotate(var(--r, 0deg)) translateY(var(--ty, 0px)); opacity: 1; filter: brightness(1); }
+  }
 
   .toast { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); z-index: 45;
            background: #fff; border: 3px solid #d99a26; border-radius: 14px; padding: 10px 22px;
@@ -255,6 +288,13 @@
 <div id="discardPanel"></div>
 <div id="logbar"><div id="log"></div></div>
 
+<div id="helpBtns">
+  <button data-panel="codex">📖 图鉴</button>
+  <button data-panel="rules">📜 规则</button>
+</div>
+<div class="modal" id="codexModal" style="display:none"><div class="inner"><div id="codexInner"></div><p style="text-align:center;margin:14px 0 0"><button data-act="closePanel" style="background:#d99a26;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 24px;font-size:14px">关闭</button></p></div></div>
+<div class="modal" id="rulesModal" style="display:none"><div class="inner"><div id="rulesInner"></div><p style="text-align:center;margin:14px 0 0"><button data-act="closePanel" style="background:#d99a26;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 24px;font-size:14px">关闭</button></p></div></div>
+
 <div class="modal" id="setupModal">
   <div class="inner">
     <h3>开局设置</h3>
@@ -287,6 +327,6 @@
 <audio id="bgm" preload="auto"></audio>
 <script src="data.js"></script>
 <script src="music-manifest.js"></script>
-<script src="game.js?v=39"></script>
+<script src="game.js?v=44"></script>
 </body>
 </html>

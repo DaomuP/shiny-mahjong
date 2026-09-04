@@ -91,7 +91,9 @@ const UNIT_NAME_RE = new RegExp('(' + Object.keys(UNIT_EFFECT).map(s => s.replac
 const wrapUnit = s => s.replace(UNIT_NAME_RE, '<span class="uname">$1</span>');
 
 const G = { players: [], display: [], deck: [], dark: [], auctionCards: [], showBid: null, turn: 0, round: 1, ap: 0, over: false, exhausted: false, logs: [] };
-const UI = { pick: null, sel: new Set(), banner: null, bidAsk: null, mainRes: null, anim: {}, waveChoose: null, discardAsk: null, darkPick: null, peekPick: null, spyView: null, forcedTarget: null, spyCloseRes: null, swap: null };
+const FRESH_UIDS = new Set();
+let prevHandUids = null;
+const UI = { pick: null, sel: new Set(), banner: null, bidAsk: null, mainRes: null, anim: {}, waveChoose: null, discardAsk: null, darkPick: null, peekPick: null, spyView: null, forcedTarget: null, spyCloseRes: null, swap: null, codexOpen: false, rulesOpen: false };
 function log(m) { G.logs.push(m); if (G.logs.length > 300) G.logs.shift(); }
 function drawCards(n) { const out = []; while (n-- > 0) { if (G.deck.length <= 8 && G.dark.length) { G.deck = shuffle(G.deck.concat(G.dark.splice(0))); log('弃牌洗回牌山'); } if (!G.deck.length) break; out.push(G.deck.pop()); } return out; }
 function sortHand(p) { p.hand.sort((a, b) => (UNIT_ORDER[a.unit] - UNIT_ORDER[b.unit]) || (a.waveKey < b.waveKey ? -1 : a.waveKey > b.waveKey ? 1 : 0) || (a.idol < b.idol ? -1 : a.idol > b.idol ? 1 : 0)); }
@@ -379,10 +381,34 @@ function render() {
   $('#auctionGrid').innerHTML = (G.auctionCards || []).map((c, k) => cardImg(c, 'mini2b', 'auc', k)).join('');
   $('#showInfo').innerHTML = `<div>当前出价 <b class="abid">${G.showBid ? G.showBid.bid : 0}</b> 张暗牌${G.showBid && G.showBid.bidder !== null ? '（' + esc(G.players[G.showBid.bidder].name) + '）' : ''}</div>${UI.bidAsk ? `<div class="ask">是否出价 ${UI.bidAsk.need} 张？<button data-bid="yes">出价</button> <button data-bid="no">放弃</button></div>` : '<div class="dim">等待轮次结束开拍</div>'}`;
   sortDisplay(); sortDark();
-  $('#displayGrid').innerHTML = G.display.map((c, idx) => { if (!c) return '<div class="tile empty"></div>'; const clickable = myTurnActive() ? 'clickable' : ''; const target = UI.swap && UI.swap.idx === idx ? ' swaptarget' : ''; return cardImg(c, clickable + target, 'display', idx); }).join('');
+  /* 听牌提醒：某组合只差 1 张成套时标记，缺牌在明牌列则单独高亮 */
+  const tenpai = { waves: new Set(), missing: new Set() };
+  for (const key in WAVES) {
+    const w = WAVES[key];
+    const held = w.ids.filter(id => me.hand.some(c => c.waveKey === key && c.idol === id));
+    if (w.size > 1 && held.length === w.size - 1) {
+      tenpai.waves.add(key);
+      const mid = w.ids.find(id => !me.hand.some(c => c.waveKey === key && c.idol === id));
+      const md = G.display.find(d => d && d.waveKey === key && d.idol === mid);
+      if (md) tenpai.missing.add(md.uid);
+    }
+  }
+  $('#displayGrid').innerHTML = G.display.map((c, idx) => { if (!c) return '<div class="tile empty"></div>'; const clickable = myTurnActive() ? 'clickable' : ''; const target = UI.swap && UI.swap.idx === idx ? ' swaptarget' : ''; const miss = tenpai.missing.has(c.uid) ? ' missing' : ''; return cardImg(c, clickable + target + miss, 'display', idx); }).join('');
   $('#mePlate').innerHTML = `<span class="pname">${esc(me.name)}</span><span class="pscore">${me.score} 分</span><span class="medone">${me.done.map(d => doneChip(d)).join('')}</span>`;
   const fanStyle = (idx, n) => { const off = idx - (n - 1) / 2; return `--r:${(off * 3.5).toFixed(1)}deg;--ty:${(off * off * 1.5).toFixed(0)}px`; };
-  $('#handRow').innerHTML = me.hand.map((c, idx) => { const picked = UI.pick && UI.pick.side === 'hand' && UI.sel.has(c.uid) ? 'picked' : ''; return cardImg(c, `${picked} big${UI.swap ? ' swapsrc' : ''}`, 'hand', idx, fanStyle(idx, me.hand.length)); }).join('');
+  const handUids = me.hand.map(c => c.uid);
+  if (prevHandUids) handUids.filter(u => !prevHandUids.has(u)).forEach(u => FRESH_UIDS.add(u));
+  prevHandUids = new Set(handUids);
+  let fi = 0;
+  $('#handRow').innerHTML = me.hand.map((c, idx) => {
+    const picked = UI.pick && UI.pick.side === 'hand' && UI.sel.has(c.uid) ? 'picked' : '';
+    const isFresh = FRESH_UIDS.has(c.uid);
+    let style = fanStyle(idx, me.hand.length);
+    if (isFresh) style += `;animation-delay:${Math.min(fi++, 8) * 80}ms`;
+    const cls = `${picked} big${UI.swap ? ' swapsrc' : ''}${tenpai.waves.has(c.waveKey) ? ' tenpai' : ''}${isFresh ? ' freshcard' : ''}`;
+    return cardImg(c, cls, 'hand', idx, style);
+  }).join('');
+  if (FRESH_UIDS.size) { clearTimeout(render._freshTimer); render._freshTimer = setTimeout(() => FRESH_UIDS.clear(), 700); }
   const myTurn = G.turn === 0 && !G.over;
   $('#apPill').textContent = `行动点 ${'●'.repeat(Math.max(0, G.ap))}${'○'.repeat(Math.max(0, AP_PER_TURN - G.ap))}`;
   $('#actions').innerHTML = myTurn && UI.mainRes && !UI.pick ? `<button data-act="draw">摸牌</button><button data-act="pass">结束回合</button>` : '';
@@ -396,6 +422,10 @@ function render() {
   $('#targetModal').innerHTML = UI.forcedTarget ? `<div class="dlgbox"><h3>强制交换：选择对手</h3><div class="eflist">${UI.forcedTarget.cands.map(p2 => `<div class="efrow"><span class="efname">${esc(p2.name)}</span><button data-target="${G.players.indexOf(p2)}">指定</button></div>`).join('')}</div><button data-act="targetCancel">取消</button></div>` : '';
   $('#waveChoose').innerHTML = UI.waveChoose ? `<div class="dlgbox"><h3>选择要胡的轮次</h3><div class="payrow">${UI.waveChoose.keys.map(k => `<span class="wavepick" data-wave="${k}">${waveMini(k)}</span>`).join('')}</div></div>` : '';
   $('#banner').innerHTML = UI.banner ? (UI.banner.kind === 'trade' ? `<div class="toast"><div class="ttitle">拍卖成交</div><div class="trow">${UI.banner.pay.map(c => cardImg(c, 'ttile')).join('')} <b>→</b> ${UI.banner.cards.map(c => cardImg(c, 'ttile')).join('')}</div><div class="tsub">${esc(UI.banner.wp.name)} 付出 ${UI.banner.bid} 张暗牌</div></div>` : `<div class="toast hu"><div class="ttitle">胡牌！+${UI.banner.total} 分</div><div class="tsub">${esc(UI.banner.p.name)} · <span class="uname">${esc(WAVES[UI.banner.tk].unit)}</span> 同一轮次全员</div><div class="trow">${waveMini(UI.banner.tk)}</div></div>`) : '';
+  $('#codexModal').style.display = UI.codexOpen ? 'flex' : 'none';
+  if (UI.codexOpen) $('#codexInner').innerHTML = codexHtml();
+  $('#rulesModal').style.display = UI.rulesOpen ? 'flex' : 'none';
+  if (UI.rulesOpen) $('#rulesInner').innerHTML = rulesHtml();
   $('#log').innerHTML = G.logs.slice(-40).map(l => `<div>${wrapUnit(esc(l))}</div>`).join('');
   $('#log').scrollTop = 999999;
 }
@@ -403,8 +433,11 @@ function myTurnActive() { return G.turn === 0 && !G.over && !!UI.mainRes && G.ap
 
 /* ================= 事件 ================= */
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-uid],[data-act],[data-bid],[data-wave],[data-target]');
+  if (e.target.classList && e.target.classList.contains('modal')) { UI.codexOpen = false; UI.rulesOpen = false; render(); return; }
+  const t = e.target.closest('[data-uid],[data-act],[data-bid],[data-wave],[data-target],[data-panel]');
   if (!t) return;
+  if (t.dataset.panel) { UI.codexOpen = t.dataset.panel === 'codex' ? !UI.codexOpen : false; UI.rulesOpen = t.dataset.panel === 'rules' ? !UI.rulesOpen : false; render(); return; }
+  if (t.dataset.act === 'closePanel') { UI.codexOpen = false; UI.rulesOpen = false; render(); return; }
   if (t.dataset.uid && UI.pick) {
     const side = t.dataset.side;
     if (side !== UI.pick.side) return;
@@ -499,6 +532,40 @@ $('#startBtn').addEventListener('click', () => {
 });
 function show(sel) { for (const id of ['#setupModal', '#scoreModal']) $(id).style.display = 'none'; if (sel) $(sel).style.display = 'flex'; }
 function showScore() { $('#scoreTitle').textContent = G.exhausted ? '牌尽流局' : '结算'; $('#scoreBody').innerHTML = G.players.map(p => `<tr><td>${esc(p.name)}</td><td><b>${p.score}</b></td><td>${p.done.map(d => waveMini(d.waveKey)).join(' ')}</td></tr>`).join(''); show('#scoreModal'); }
+function codexHtml() {
+  const units = [...new Set(Object.values(WAVES).map(w => w.unit))].sort((a, b) => UNIT_ORDER[a] - UNIT_ORDER[b]);
+  return units.map(u => {
+    const waves = Object.values(WAVES).filter(w => w.unit === u).sort((a, b) => a.idx - b.idx);
+    const wavesHtml = waves.map(w => {
+      const done = G.players[0].done.some(d => d.waveKey === w.key);
+      const cards = w.ids.map(id => {
+        const c = ALLCARDS.find(x => x.waveKey === w.key && x.idol === id);
+        if (!c) return '';
+        const held = G.players[0].hand.some(h => h.uid === c.uid);
+        return cardImg(c, `codexcard${held ? ' held' : ''}`);
+      }).join('');
+      return `<div class="codexwave"><div class="codexhead">${done ? '✅ ' : ''}${w.size} 人套 · ${huScore(w.size)} 分${done ? ' · 已胡' : ''}</div><div class="payrow">${cards}</div></div>`;
+    }).join('');
+    return `<h4>${u}</h4>${wavesHtml}`;
+  }).join('');
+}
+function rulesHtml() {
+  const sizes = [...new Set(Object.values(WAVES).map(w => w.size))].sort((a, b) => a - b);
+  const effects = Object.keys(UNIT_EFFECT).map(u => `<tr><td class="uname">${u}</td><td>${UNIT_EFFECT[u].name}</td><td>${UNIT_EFFECT[u].desc}</td></tr>`).join('');
+  return `<h3>游戏规则</h3>
+  <p><b>目标：</b>共 ${MAX_ROUND} 回合，收集“同组合 · 同轮次”的全部成员（胡牌）得分，终局总分最高者胜。</p>
+  <p><b>每回合 2 行动点：</b></p>
+  <ul><li>摸牌：从牌山摸 1 张（1 点）</li>
+  <li>交换：点击明牌列 1 张 → 再点手牌 1 张，两张互换（1 点）</li>
+  <li>弃牌发动：点击手牌 1 张 → 确认弃掉并发动组合效果（1 点，每回合一次）</li>
+  <li>结束回合（0 点）</li></ul>
+  <p><b>胡牌：</b>手牌集齐某轮次全部成员自动胡牌；胡后从牌山补 (人数 − 2) 张，2 人组不补。</p>
+  <p><b>计分（本局牌池 ${ALLCARDS.length} 张）：</b>${sizes.map(k => k + ' 人套 ' + huScore(k) + ' 分').join('，')}。分值 ∝ 套内共处牌对数 C(k,2)。</p>
+  <p><b>拍卖：</b>每轮结束举行整包竞拍，出价即支付的暗牌张数，价高者得；无人出价则整包进入明牌列。</p>
+  <p><b>听牌提醒：</b>某组合只差 1 张成套时，手牌组员蓝色呼吸高亮，缺牌若在明牌列则粉色高亮。</p>
+  <h4>组合效果（点击手牌 → 确认弃牌发动，1 行动点）</h4>
+  <table class="ruletbl"><tr><th>组合</th><th>效果</th><th>说明</th></tr>${effects}</table>`;
+}
 $('#scoreClose').addEventListener('click', () => location.reload());
 $('#sfxBtn').addEventListener('click', () => { sfxOn = !sfxOn; $('#sfxBtn').textContent = sfxOn ? '🔊 音效:开' : '🔇 音效:关'; if (bgmEl) { if (sfxOn) bgmEl.play().catch(() => {}); else bgmEl.pause(); } });
 $('#logBtn').addEventListener('click', () => { document.body.classList.toggle('logOpen'); });
