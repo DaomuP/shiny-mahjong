@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>轮次麻将桌</title>
+<style>
+  :root { color-scheme: light; }
+  @font-face { font-family: 'FZKT'; src: url('assets/font.ttf') format('truetype'); font-display: swap; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: 'FZKT', '方正卡通简体', "Segoe UI", "Microsoft YaHei", sans-serif; color: #1d2a3a;
+         background: linear-gradient(180deg, #8ec9ec 0%, #b9def4 45%, #8ec9ec 100%); overflow: hidden;
+         display: flex; flex-direction: column; }
+  button { font-family: inherit; cursor: pointer; }
+
+  header { flex: none; height: 40px; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 0 14px;
+           background: #1d3a5f; color: #dce9f7; font-size: 13px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 700; color: #fff; }
+  #turnHint { color: #ffd479; }
+  #statusPill { margin-left: auto; background: #2c5a8f; border: 1px solid #4a7fb5; border-radius: 12px; padding: 2px 14px; font-size: 12px; }
+
+  #table { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  #seatsRow { display: flex; justify-content: center; gap: 14px; padding: 6px 12px 4px; flex: none; flex-wrap: wrap; }
+  .seat { background: #ffffffe6; border: 1px solid #9cc3e0; border-radius: 10px; padding: 6px 10px; box-shadow: 0 2px 8px #1d3a5f33; }
+  .seat.turn { outline: 3px solid #ffcf5e; }
+  .plate { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .pname { font-size: 13px; font-weight: 700; color: #1d3a5f; }
+  .pscore { font-size: 12px; background: #1d3a5f; color: #ffd479; border-radius: 8px; padding: 1px 8px; }
+  .backs { display: flex; flex-wrap: wrap; gap: 2px; max-width: 300px; }
+  .tileback { width: 24px; height: 33px; border-radius: 3px; background: repeating-linear-gradient(45deg, #f4f8fc, #f4f8fc 3px, #cfe0ef 3px, #cfe0ef 6px); border: 1px solid #7fa8cc; }
+  .donerow { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 3px; }
+  .donechip { display: inline-flex; align-items: center; gap: 4px; background: #2c5a8f; color: #dce9f7;
+              border: 1px solid #7fa8cc; border-radius: 10px; padding: 2px 8px; font-size: 12px;
+              position: relative; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .donechip b { color: #ffd479; }
+  .uname, .unitopt { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .donechip .donepop { display: none; position: absolute; bottom: calc(100% + 6px); left: 0;
+                       background: #f4f8fc; border: 2px solid #7fa8cc; border-radius: 8px;
+                       padding: 4px; z-index: 8; white-space: nowrap; }
+  .donechip:hover .donepop { display: inline-flex; }
+
+  #centerPanel { margin: auto; width: calc(100% - 40px); flex: 1 1 auto; min-height: 0; overflow: hidden;
+                 display: flex; flex-direction: row; gap: 18px;
+                 background: linear-gradient(180deg, #3a6ea8, #2c5a8f);
+                 border: 4px solid #ffffffaa; border-radius: 18px; padding: 12px 18px 10px;
+                 box-shadow: 0 6px 24px #1d3a5f55, inset 0 0 40px #1d3a5f44; }
+  #tableMain { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  #tableSide { flex: none; width: clamp(270px, 24%, 400px); display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  #centerPanel h3 { margin: 0 0 6px; font-size: 12px; color: #cfe0ef; font-weight: 700; letter-spacing: 4px; }
+  .cardgrid { display: grid; gap: 8px; }
+  #auctionGrid { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  #displayGrid { display: flex; gap: 14px; flex-wrap: wrap; align-content: flex-start; }
+  #displayGrid .tile { width: 110px; height: 154px; }
+  #displayGrid .tile:hover { overflow: visible; z-index: 40; }
+  #displayGrid .tile:hover img.pv {
+    display: block; position: absolute; width: 360px; height: 203px; left: 50%; top: 50%;
+    transform: translate(-50%, -50%); pointer-events: none;
+    object-fit: contain; background: #fff; border-radius: 6px;
+    outline: 3px solid #ffd479; box-shadow: 0 16px 36px #1d3a5f88;
+    z-index: 40;
+  }
+  .showcasewrap { min-height: 122px; }
+  #showInfo { flex: none; min-height: 148px; border: 2px solid #5a9cf8aa; background: #1d3a5f66;
+              border-radius: 12px; padding: 14px 16px; font-size: 14px; color: #cfe0ef;
+              display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+  #showInfo .abid { font-size: 24px; margin: 0 2px; }
+  .abid { font-size: 18px; color: #ffd479; font-weight: 800; }
+  .ask { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-weight: 700; }
+  .ask button { background: #f0b13d; color: #4a2f00; font-weight: 700; border: none; border-radius: 8px; padding: 6px 18px; font-size: 14px; margin-right: 6px; box-shadow: 0 2px 5px #1d3a5f44; }
+  #piles { flex: 1 1 auto; min-height: 220px; display: flex; align-items: center; justify-content: center; gap: 34px; padding: 16px 8px; }
+  .pile { flex: none; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .pilelabel { font-size: 15px; font-weight: 700; letter-spacing: 4px; color: #dce9f7; }
+  .pilecount { background: #1d3a5f; color: #ffd479; border-radius: 10px; padding: 3px 14px; font-size: 13px; font-weight: 700; }
+  .pilestack { position: relative; width: 92px; height: 130px; }
+  .pilestack .tileback2 { position: absolute; width: 92px; height: 130px; border-radius: 8px; border: 2px solid #cfe0ef; box-shadow: 0 3px 8px #1d3a5f55; }
+  #deckPile .tileback2 { background: repeating-linear-gradient(45deg, #3a6ea8, #3a6ea8 4px, #2c5a8f 4px, #2c5a8f 8px); }
+  #darkPile .tileback2 { background: repeating-linear-gradient(45deg, #556070, #556070 4px, #434c5a 4px, #434c5a 8px); border-color: #9aa8bb; }
+  .pilestack .tileback2:nth-child(1) { transform: translate(7px, 7px); opacity: .45; }
+  .pilestack .tileback2:nth-child(2) { transform: translate(3.5px, 3.5px); opacity: .7; }
+  .pilestack .tileback2:nth-child(3) { transform: none; }
+  .pile.pileempty .pilestack { opacity: .3; }
+
+  .tile { position: relative; border-radius: 6px; background: #fff; flex: none;
+          box-shadow: 0 2px 5px #1d3a5f44; overflow: hidden; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile img.pv { display: none; }
+  .tile.empty { border: 1px dashed #ffffff44; background: #ffffff11; box-shadow: none; }
+  .tile.clickable { cursor: pointer; outline: 3px solid #ffd479; }
+  .tile.clickable:hover { outline-color: #fff; }
+  .tile.picked { outline: 4px solid #ff9d00; transform: translateY(-6px); }
+  .wavemini { display: inline-flex; border: 1px solid #7fa8cc; border-radius: 4px; overflow: hidden; vertical-align: middle; background: #fff; }
+  .wavemini img { height: 26px; width: auto; display: block; }
+  .wavemini img + img { border-left: 1px solid #cfe0ef; }
+  .dim { color: #6a8ab0; font-size: 12px; }
+
+  #meArea { position: relative; z-index: 10; padding: 4px 18px 0; background: linear-gradient(180deg, #1d3a5f00, #1d3a5f44); }
+  #mePlate { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  #mePlate .pname { font-size: 14px; font-weight: 700; color: #1d3a5f; }
+  #mePlate .pscore { font-size: 12px; background: #1d3a5f; color: #ffd479; border-radius: 8px; padding: 1px 8px; }
+  #mePlate .medone { display: flex; flex-wrap: wrap; gap: 4px; }
+  #handRow { display: flex; justify-content: center; height: 124px; align-items: flex-start; }
+  #hud { position: fixed; left: 14px; bottom: 12px; z-index: 30; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  .tile { position: relative; border-radius: 6px; background: #fff; flex: none;
+          box-shadow: 0 2px 5px #1d3a5f44; overflow: hidden; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile img.pv { display: none; }
+  .tile.clickable { cursor: pointer; outline: 3px solid #ffd479; }
+  .tile.clickable:hover { outline-color: #fff; }
+  .tile.picked { outline: 4px solid #ff9d00; transform: translateY(-6px); }
+  .tile.swaptarget { outline: 4px solid #ff9d00; }
+  .tile.swapsrc { cursor: pointer; }
+  .tile.mini2b { width: 64px; height: 90px; }
+  #auctionGrid .tile.mini2b { width: 200px; height: 113px; }
+  #auctionGrid .tile.mini2b img { object-fit: contain; }
+
+  /* 手牌扇形排列：底部约 1/4 藏出屏幕外，hover 整体升起 */
+  #handRow .tile.big {
+    width: 120px; height: 168px;
+    margin-left: -46px;
+    transform-origin: 50% 115%;
+    transform: rotate(var(--r, 0deg)) translateY(var(--ty, 0px));
+    transition: transform .18s ease, margin-left .18s ease;
+    z-index: 1;
+  }
+  #handRow .tile.big:first-child { margin-left: 0; }
+  #handRow .tile.big.picked { transform: rotate(0deg) translateY(calc(-64px - var(--ty, 0px))); z-index: 30; }
+  #handRow .tile.big:hover { overflow: visible; z-index: 40; transform: rotate(0deg) translateY(calc(-92px - var(--ty, 0px))); }
+  #handRow .tile.big:hover img {
+    position: absolute; width: 360px; height: 203px; left: 50%; top: 50%;
+    transform: translate(-50%, -50%); pointer-events: none;
+    object-fit: contain; background: #fff; border-radius: 6px;
+    outline: 4px solid #ffd479; box-shadow: 0 16px 36px #1d3a5f88;
+    z-index: 40;
+  }
+  .wavemini { display: inline-flex; border: 1px solid #7fa8cc; border-radius: 4px; overflow: hidden; vertical-align: middle; background: #fff; }
+  .wavemini img { height: 26px; width: auto; display: block; }
+  .wavemini img + img { border-left: 1px solid #cfe0ef; }
+  .dim { color: #8ab0d4; font-size: 12px; }
+
+
+
+
+  #actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #actions button { background: linear-gradient(180deg, #f0b13d, #d99a26); color: #4a2f00; font-weight: 800;
+                    border: 1px solid #b57f1a; border-radius: 10px; padding: 9px 20px; font-size: 14px;
+                    box-shadow: 0 2px 5px #1d3a5f44; }
+  #apPill { background: #1d3a5f; color: #ffd479; border-radius: 10px; padding: 4px 12px; font-size: 14px; font-weight: 800; }
+  #pickHint { font-size: 13px; color: #7a4a00; font-weight: 700; }
+  #pickHint button { background: #fff; border: 1px solid #9cc3e0; border-radius: 6px; padding: 3px 10px; }
+  #pickConfirm { }
+  #pickConfirm button { background: #ff9d00; color: #fff; font-weight: 700; border: none; border-radius: 8px; padding: 8px 16px; font-size: 14px; }
+
+  .toast { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); z-index: 45;
+           background: #fff; border: 3px solid #d99a26; border-radius: 14px; padding: 10px 22px;
+           box-shadow: 0 10px 26px #1d3a5f66; text-align: center; max-width: 90vw; }
+  .toast.hu { border-color: #b57f1a; background: #fff8e8; }
+  .toast .trow { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 6px; flex-wrap: wrap; }
+  .toast .ttile { width: 52px; height: 73px; }
+  .toast .tsub { font-size: 13px; color: #4a6a8f; margin-top: 4px; }
+  .toast .ttitle { font-weight: 800; color: #b57f1a; font-size: 16px; }
+
+  .modal { position: fixed; inset: 0; background: #1d3a5fcc; display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .modal .inner { background: #f4f8fc; border: 2px solid #7fa8cc; border-radius: 12px; padding: 20px 26px; max-width: 86vw; max-height: 86vh; overflow-y: auto; color: #1d3a5f; }
+  .modal h3 { margin: 0 0 12px; }
+  .modal p { color: #4a6a8f; }
+
+  .dlgbox { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 46;
+            background: #f4f8fc; border: 2px solid #7fa8cc; border-radius: 14px;
+            padding: 16px 24px; box-shadow: 0 12px 30px #1d3a5f66;
+            max-width: min(760px, 92vw); max-height: 74vh; overflow-y: auto; color: #1d3a5f; }
+  .dlgbox h3 { margin: 0 0 10px; }
+  .payrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+  #spyModal .tile.mini2b { width: 200px; height: 113px; }
+  #spyModal .tile.mini2b img { object-fit: contain; }
+  #peekModal .tile.mini2b, #darkModal .tile.mini2b { width: 200px; height: 113px; }
+  #peekModal .tile.mini2b img, #darkModal .tile.mini2b img { object-fit: contain; }
+  .eflist { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+  .efrow { display: flex; align-items: center; gap: 10px; }
+  .efrow .efname { font-weight: 700; min-width: 200px; }
+  .efrow .efdesc { flex: 1; font-size: 12px; color: #4a6a8f; }
+  .wavepick { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer;
+              border: 2px solid transparent; border-radius: 6px; padding: 4px; }
+  .wavepick:hover { border-color: #d99a26; }
+  .wavepick.sel { border-color: #ff9d00; background: #ffd47933; }
+
+  #unitList { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .unitopt { font-size: 14px; }
+
+  #logbar { position: fixed; top: 40px; right: 0; bottom: 0; width: 190px; z-index: 25;
+            background: #1d3a5fee; padding: 8px 10px; transform: translateX(100%); transition: transform .22s ease; }
+  body.logOpen #logbar { transform: none; }
+  #log { font-size: 11px; color: #b9d0e8; max-height: 100%; overflow-y: auto; line-height: 1.7; }
+
+  .veiled { opacity: 0 !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>轮次麻将桌</h1>
+  <span id="turnHint"></span>
+  <button id="sfxBtn" style="padding:3px 10px;font-size:12px">🔊 音效:开</button>
+  <button id="logBtn" style="padding:3px 10px;font-size:12px">📜 履历</button>
+  <span id="statusPill"></span>
+</header>
+
+<div id="table">
+  <div id="seatsRow"></div>
+  <div id="centerPanel">
+    <div id="tableMain">
+      <h3>拍 卖 台</h3>
+      <div class="showcasewrap">
+        <div id="auctionGrid"></div>
+      </div>
+      <h3>明 牌 列</h3>
+      <div id="displayGrid"></div>
+    </div>
+    <div id="tableSide">
+      <div id="showInfo" class="showinfo"></div>
+      <div id="piles">
+        <div class="pile" id="deckPile">
+          <div class="pilestack"><div class="tileback2"></div><div class="tileback2"></div><div class="tileback2"></div></div>
+          <div class="pilelabel">牌 山</div>
+          <span class="pilecount" id="deckCount"></span>
+        </div>
+        <div class="pile" id="darkPile">
+          <div class="pilestack"><div class="tileback2"></div><div class="tileback2"></div><div class="tileback2"></div></div>
+          <div class="pilelabel">弃 牌</div>
+          <span class="pilecount" id="darkCount"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="meArea">
+  <div id="mePlate"></div>
+  <div id="handRow"></div>
+  <div id="hud">
+    <div id="apPill"></div>
+    <div id="actions"></div>
+    <div id="pickHint"></div>
+    <div id="pickConfirm"></div>
+  </div>
+</div>
+
+<div id="effectMenu"></div>
+<div id="darkModal"></div>
+<div id="peekModal"></div>
+<div id="spyModal"></div>
+<div id="targetModal"></div>
+<div id="waveChoose"></div>
+<div id="banner"></div>
+
+<div id="discardPanel"></div>
+<div id="logbar"><div id="log"></div></div>
+
+<div class="modal" id="setupModal">
+  <div class="inner">
+    <h3>开局设置</h3>
+    <p style="color:#4a6a8f;font-size:13px;margin:4px 0">选择入局的组合（人数少的组合套装分低，默认不选）：</p>
+    <div id="unitList"></div>
+    <p style="color:#4a6a8f;font-size:13px;margin:4px 0">对手数量：</p>
+    <div style="display:flex;gap:16px;margin:8px 0 16px">
+      <label><input type="radio" name="ai" value="1" checked> 1 个</label>
+      <label><input type="radio" name="ai" value="2"> 2 个</label>
+      <label><input type="radio" name="ai" value="3"> 3 个（4 人局）</label>
+    </div>
+    <p style="color:#4a6a8f;font-size:13px;margin:4px 0">每个组合入局的轮次数（越少池子越小，牌越容易撞）：</p>
+    <div style="display:flex;gap:16px;margin:8px 0 16px">
+      <label><input type="radio" name="wpu" value="3" checked> 3 个（随机）</label>
+      <label><input type="radio" name="wpu" value="5"> 5 个（随机）</label>
+      <label><input type="radio" name="wpu" value="0"> 全部</label>
+    </div>
+    <button id="startBtn" style="background:#d99a26;color:#fff;font-weight:700;border:none;border-radius:8px;padding:10px 30px;font-size:15px">开始</button>
+  </div>
+</div>
+
+<div class="modal" id="scoreModal" style="display:none">
+  <div class="inner">
+    <h3 id="scoreTitle">结算</h3>
+    <table><tbody id="scoreBody"></tbody></table>
+    <p style="margin-top:12px"><button id="scoreClose" style="background:#d99a26;color:#fff;font-weight:700;border:none;border-radius:8px;padding:10px 24px">再来一局</button></p>
+  </div>
+</div>
+
+<audio id="bgm" preload="auto"></audio>
+<script src="data.js"></script>
+<script src="music-manifest.js"></script>
+<script src="game.js?v=38"></script>
+</body>
+</html>
